@@ -15,9 +15,12 @@ import TimetablePage from './components/TimetablePage';
 import OverallStats from './components/OverallStats';
 import ThreeARoadmap from './components/ThreeARoadmap';
 import BadgesHub from './components/BadgesHub';
+import AdminPage from './components/AdminPage';
 import { fetchLatestExamNews, ExamNews as ExamNewsType } from './services/geminiService';
+import { db } from './services/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
-type View = 'dashboard' | 'curriculum' | 'tools' | 'timetable' | 'stats' | 'credits' | 'badges';
+type View = 'dashboard' | 'curriculum' | 'tools' | 'timetable' | 'stats' | 'credits' | 'badges' | 'admin';
 
 const STORAGE_KEYS = {
   USER: 'al_user_v2',
@@ -41,7 +44,7 @@ const INITIAL_BADGES: Badge[] = [
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [activeView, setActiveView] = useState<View>('dashboard');
-  const [currentExamDate] = useState<Date>(EXAM_DATE);
+  const [currentExamDate, setCurrentExamDate] = useState<Date>(EXAM_DATE);
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [news, setNews] = useState<ExamNewsType | null>(null);
   const [lastNewsUpdate, setLastNewsUpdate] = useState<string | null>(null);
@@ -51,6 +54,20 @@ const App: React.FC = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [badges, setBadges] = useState<Badge[]>(INITIAL_BADGES);
   const [stats, setStats] = useState<UserStats>({ currentStreak: 0, lastActiveDate: '', totalUnitsCompleted: 0 });
+
+  useEffect(() => {
+    // Listen to Firebase admin configuration
+    const settingsDoc = doc(db, 'settings', 'global');
+    const unsub = onSnapshot(settingsDoc, (docSnap) => {
+      if (docSnap.exists() && docSnap.data().examDate) {
+        setCurrentExamDate(new Date(docSnap.data().examDate));
+      }
+    }, (error) => {
+      // It's public, but if there's an error, just log it.
+      console.error("Error fetching settings:", error);
+    });
+    return () => unsub();
+  }, []);
 
   const batchIndex = useMemo(() => {
     if (subjects.length === 0) return 0;
@@ -241,7 +258,10 @@ const App: React.FC = () => {
     </div>
   );
   
-  if (!user) return <LoginPage onLogin={handleLogin} />;
+  if (!user) return <LoginPage onLogin={handleLogin} onAdminLogin={() => {
+    setUser({ name: 'Admin', isLoggedIn: true, streamId: AL_STREAMS[0].id });
+    setActiveView('admin');
+  }} />;
 
   const renderView = () => {
     switch(activeView) {
@@ -368,6 +388,8 @@ const App: React.FC = () => {
         );
       case 'credits':
         return <div className="max-w-7xl mx-auto w-full px-2 md:px-0"><CreditsPage /></div>;
+      case 'admin':
+        return <div className="max-w-7xl mx-auto w-full px-2 md:px-0"><AdminPage currentExamDate={currentExamDate} /></div>;
       default:
         return null;
     }
@@ -456,6 +478,14 @@ const App: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
               </svg>
             } />
+            {user.name === 'Admin' && (
+              <NavItem view="admin" label="Admin" icon={
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              } />
+            )}
           </nav>
           <div className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 pointer-events-auto mt-2 text-center opacity-80">
             Dev by Pramod Udagamagedara

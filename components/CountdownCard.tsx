@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { motion } from 'motion/react';
 import { TimeLeft } from '../types';
 
 // Countdown presentation component
@@ -25,15 +24,11 @@ const CountdownCard: React.FC<CountdownCardProps> = ({ timeLeft }) => {
                 className="digit-box rounded-lg md:rounded-2xl w-8 h-12 sm:w-10 sm:h-16 md:w-16 md:h-24 flex items-center justify-center relative overflow-hidden"
               >
                 <div className="absolute top-1/2 left-0 w-full h-[1px] bg-white/5 z-10" />
-                <motion.span 
-                  key={`${label}-${idx}-${digit}`} 
-                  initial={{ opacity: 0, scale: 0.85, y: 4 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ duration: 0.4, ease: [0.175, 0.885, 0.32, 1.275] }}
+                <span 
                   className="text-xl sm:text-3xl md:text-6xl font-black font-mono-tech text-white relative z-0"
                 >
                   {digit}
-                </motion.span>
+                </span>
               </div>
             ))}
           </div>

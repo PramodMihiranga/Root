@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "Settings": {
+      "title": "Settings",
+      "description": "Global application settings",
+      "type": "object",
+      "properties": {
+        "examDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The current planned date for the exam"
+        }
+      },
+      "required": ["examDate"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "An admin user",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The email of the admin"
+        }
+      },
+      "required": ["email"]
+    },
+    "GlobalStats": {
+      "title": "GlobalStats",
+      "description": "Global usage analytics",
+      "type": "object",
+      "properties": {
+        "totalLogins": {
+          "type": "number",
+          "description": "Total number of logins over all time"
+        },
+        "totalActiveUsers": {
+          "type": "number",
+          "description": "Number of users who have signed in"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "settings/{settingId}": {
+      "schema": "Settings",
+      "description": "Contains global settings like the 'global' document"
+    },
+    "admins/{userId}": {
+      "schema": "Admin",
+      "description": "Users who are authorized as admins"
+    },
+    "stats/{statId}": {
+      "schema": "GlobalStats",
+      "description": "Contains global unauthenticated metrics like the 'global' document"
+    }
+  }
+}

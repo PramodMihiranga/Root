@@ -2,12 +2,15 @@
 import React, { useState, useMemo } from 'react';
 import { AL_STREAMS } from '../constants';
 import { Subject } from '../types';
+import { loginWithGoogle, db, auth } from '../services/firebase';
+import { doc, setDoc, increment } from 'firebase/firestore';
 
 interface LoginPageProps {
   onLogin: (name: string, remember: boolean, streamId: string, chosenSubjects: Subject[]) => void;
+  onAdminLogin: () => void;
 }
 
-const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onAdminLogin }) => {
   const [name, setName] = useState('');
   const [streamId, setStreamId] = useState(AL_STREAMS[0].id);
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
@@ -35,7 +38,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     setError('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError('Please enter your name');
@@ -50,6 +53,16 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       selectedSubjectIds.includes(s.id)
     );
     
+    try {
+      const statsRef = doc(db, 'stats', 'global');
+      await setDoc(statsRef, {
+        totalLogins: increment(1),
+        totalActiveUsers: increment(1)
+      }, { merge: true });
+    } catch (err) {
+      console.error("Failed to increment stats:", err);
+    }
+
     onLogin(name, remember, streamId, chosenSubjects);
   };
 
@@ -199,6 +212,25 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             >
               Initialize Strategy
             </button>
+            <div className="pt-6 mt-6 border-t border-slate-800/50 flex flex-col items-center">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await loginWithGoogle();
+                    onAdminLogin();
+                  } catch (err) {
+                    setError('Failed to login as admin.');
+                  }
+                }}
+                className="text-xs text-slate-500 hover:text-slate-300 font-bold uppercase tracking-widest transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                </svg>
+                Sign in as Administrator
+              </button>
+            </div>
           </div>
         </form>
       </div>
