@@ -79,5 +79,23 @@ service cloud.firestore {
         && incoming().totalLogins is number
         && incoming().totalActiveUsers is number;
     }
+
+    function isValidAnnouncement(data) {
+      return data.keys().hasAll(['title', 'message', 'createdAt'])
+        && data.keys().size() == 3
+        && data.title is string && data.title.size() <= 100
+        && data.message is string && data.message.size() <= 1000
+        && data.createdAt is string;
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if true;
+      
+      allow create: if isValidId(announcementId)
+        && isAdmin()
+        && isValidAnnouncement(incoming());
+        
+      allow delete: if isValidId(announcementId) && isAdmin();
+    }
   }
 }

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection, deleteDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../services/firebaseErrorHandler';
-import { Calendar, Users, Activity, Settings, TrendingUp, Key } from 'lucide-react';
+import { Calendar, Users, Activity, Settings, TrendingUp, Key, Megaphone, Trash2 } from 'lucide-react';
 
 interface AdminPageProps {
   currentExamDate: Date;
@@ -19,10 +19,16 @@ const AdminPage: React.FC<AdminPageProps> = ({ currentExamDate }) => {
     totalActiveUsers: 0
   });
   const [statsError, setStatsError] = useState('');
+  
+  const [announcements, setAnnouncements] = useState<{id: string, title: string, message: string, createdAt: string}[]>([]);
+  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState('');
+  const [newAnnouncementMsg, setNewAnnouncementMsg] = useState('');
+  const [announcementLoading, setAnnouncementLoading] = useState(false);
+  const [announcementError, setAnnouncementError] = useState('');
 
   useEffect(() => {
     const statsRef = doc(db, 'stats', 'global');
-    const unsub = onSnapshot(statsRef, (docSnap) => {
+    const unsubStats = onSnapshot(statsRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setStats({
@@ -31,7 +37,6 @@ const AdminPage: React.FC<AdminPageProps> = ({ currentExamDate }) => {
         });
         setStatsError('');
       } else {
-        // Document might not exist yet
         setStatsError('No stats gathered yet.');
       }
     }, (err) => {
@@ -39,8 +44,55 @@ const AdminPage: React.FC<AdminPageProps> = ({ currentExamDate }) => {
       console.error(err);
     });
 
-    return () => unsub();
+    const annRef = collection(db, 'announcements');
+    const unsubAnn = onSnapshot(annRef, (querySnap) => {
+      const items: any[] = [];
+      querySnap.forEach(docSnap => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      // Sort newest first locally
+      items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setAnnouncements(items);
+    }, (err) => {
+      console.error("Announcements fetch error:", err);
+    });
+
+    return () => {
+      unsubStats();
+      unsubAnn();
+    };
   }, []);
+
+  const handlePostAnnouncement = async () => {
+    if (!newAnnouncementTitle.trim() || !newAnnouncementMsg.trim()) {
+      setAnnouncementError("Title and message are required.");
+      return;
+    }
+    setAnnouncementLoading(true);
+    setAnnouncementError('');
+    try {
+      const id = Date.now().toString();
+      await setDoc(doc(db, 'announcements', id), {
+        title: newAnnouncementTitle,
+        message: newAnnouncementMsg,
+        createdAt: new Date().toISOString()
+      });
+      setNewAnnouncementTitle('');
+      setNewAnnouncementMsg('');
+    } catch (err: any) {
+      setAnnouncementError("Failed to post: " + (err.message || 'Access Denied'));
+    } finally {
+      setAnnouncementLoading(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'announcements', id));
+    } catch (err: any) {
+      console.error("Delete error", err);
+    }
+  };
 
   const handleUpdateDate = async () => {
     if (!newDate) {
@@ -202,6 +254,87 @@ const AdminPage: React.FC<AdminPageProps> = ({ currentExamDate }) => {
                  </div>
                )}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Global Announcements Section */}
+      <div className="glass-card p-8 rounded-[2rem] border border-amber-500/10 relative overflow-hidden mt-8 mx-2 md:mx-0">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-3xl rounded-full" />
+        <h2 className="text-xl md:text-2xl font-black font-outfit text-white mb-6 flex items-center gap-3">
+          <Megaphone className="w-6 h-6 text-amber-400" />
+          Global Announcements
+        </h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10">
+          {/* Post New Announcement */}
+          <div className="space-y-4 bg-slate-900/30 p-6 rounded-2xl border border-white/5">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Broadcast Message</h3>
+            
+            <input
+              type="text"
+              placeholder="Announcement Title"
+              value={newAnnouncementTitle}
+              onChange={(e) => setNewAnnouncementTitle(e.target.value)}
+              className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500/50"
+            />
+            
+            <textarea
+              placeholder="Announcement Body..."
+              value={newAnnouncementMsg}
+              onChange={(e) => setNewAnnouncementMsg(e.target.value)}
+              className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500/50 min-h-[120px] resize-none"
+            />
+
+            {announcementError && (
+              <div className="text-red-400 text-xs font-bold bg-red-500/10 p-3 rounded-lg border border-red-500/20">
+                {announcementError}
+              </div>
+            )}
+
+            <button
+              onClick={handlePostAnnouncement}
+              disabled={announcementLoading}
+              className="w-full py-3 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-400 hover:text-amber-300 font-bold rounded-xl transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-[10px]"
+            >
+              {announcementLoading ? 'Publishing...' : 'Deploy Broadcast'}
+            </button>
+          </div>
+
+          {/* List of Announcements */}
+          <div className="space-y-4">
+             <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 px-2">Active Broadcasts</h3>
+             {announcements.length === 0 ? (
+               <div className="text-center py-8 text-slate-500 text-xs uppercase tracking-widest border border-slate-800 border-dashed rounded-xl">
+                 No active broadcasts
+               </div>
+             ) : (
+               <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                 {announcements.map((ann) => (
+                   <div key={ann.id} className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 group">
+                     <div className="flex justify-between items-start gap-4">
+                       <div>
+                         <h4 className="text-amber-400 font-bold">{ann.title}</h4>
+                         <p className="text-slate-400 text-sm mt-1 whitespace-pre-wrap">{ann.message}</p>
+                         <p className="text-[10px] text-slate-600 mt-3 font-mono">
+                           {new Date(ann.createdAt).toLocaleString()}
+                         </p>
+                       </div>
+                       <button
+                         onClick={() => {
+                           if (window.confirm("Delete this broadcast?")) {
+                             handleDeleteAnnouncement(ann.id);
+                           }
+                         }}
+                         className="p-2 text-slate-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                       >
+                         <Trash2 className="w-4 h-4" />
+                       </button>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
           </div>
         </div>
       </div>

@@ -18,7 +18,7 @@ import BadgesHub from './components/BadgesHub';
 import AdminPage from './components/AdminPage';
 import { fetchLatestExamNews, ExamNews as ExamNewsType } from './services/geminiService';
 import { db } from './services/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection } from 'firebase/firestore';
 
 type View = 'dashboard' | 'curriculum' | 'tools' | 'timetable' | 'stats' | 'credits' | 'badges' | 'admin';
 
@@ -54,11 +54,12 @@ const App: React.FC = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [badges, setBadges] = useState<Badge[]>(INITIAL_BADGES);
   const [stats, setStats] = useState<UserStats>({ currentStreak: 0, lastActiveDate: '', totalUnitsCompleted: 0 });
+  const [activeAnnouncements, setActiveAnnouncements] = useState<any[]>([]);
 
   useEffect(() => {
     // Listen to Firebase admin configuration
     const settingsDoc = doc(db, 'settings', 'global');
-    const unsub = onSnapshot(settingsDoc, (docSnap) => {
+    const unsubSettings = onSnapshot(settingsDoc, (docSnap) => {
       if (docSnap.exists() && docSnap.data().examDate) {
         setCurrentExamDate(new Date(docSnap.data().examDate));
       }
@@ -66,7 +67,21 @@ const App: React.FC = () => {
       // It's public, but if there's an error, just log it.
       console.error("Error fetching settings:", error);
     });
-    return () => unsub();
+
+    const annRef = collection(db, 'announcements');
+    const unsubAnn = onSnapshot(annRef, (snap) => {
+      const items: any[] = [];
+      snap.forEach(docSnap => items.push({ id: docSnap.id, ...docSnap.data() }));
+      items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setActiveAnnouncements(items);
+    }, (error) => {
+      console.error("Error fetching announcements:", error);
+    });
+
+    return () => {
+      unsubSettings();
+      unsubAnn();
+    };
   }, []);
 
   const batchIndex = useMemo(() => {
@@ -305,6 +320,31 @@ const App: React.FC = () => {
             </section>
 
             <ThreeARoadmap subjects={subjects} goals={goals} badges={badges} />
+
+            {activeAnnouncements && activeAnnouncements.length > 0 && (
+              <div className="w-full space-y-4">
+                <h2 className="text-xl md:text-3xl font-black font-outfit text-white tracking-tight flex items-center gap-3 px-2">
+                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-[1.2rem] bg-amber-600/10 flex items-center justify-center text-amber-500 border border-amber-500/20 text-sm md:text-base">📣</div>
+                  System Broadcasts
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                  {activeAnnouncements.map((ann) => (
+                    <div key={ann.id} className="relative overflow-hidden glass-card p-6 rounded-3xl border border-amber-500/20 group">
+                      <div className="absolute top-0 left-0 w-1 rounded-full h-full bg-gradient-to-b from-amber-400 to-amber-700" />
+                      <div className="pl-4">
+                        <div className="flex justify-between items-start gap-4 mb-2">
+                          <h3 className="text-amber-400 font-bold font-outfit text-lg">{ann.title}</h3>
+                          <span className="text-[9px] font-mono-tech text-slate-500 whitespace-nowrap pt-1">
+                            {new Date(ann.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{ann.message}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-16 w-full">
               <div className="lg:col-span-7 space-y-10 md:space-y-12">
