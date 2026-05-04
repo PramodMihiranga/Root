@@ -13,7 +13,7 @@ export interface ExamNews {
 export const fetchLatestExamNews = async (): Promise<ExamNews> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: "Search for the GCE A/L official examination schedule from the Department of Examinations Sri Lanka (doenets.lk). Focus strictly on the upcoming academic cycle.",
       config: {
         tools: [{ googleSearch: {} }],
@@ -35,8 +35,12 @@ export const fetchLatestExamNews = async (): Promise<ExamNews> => {
       sources: sources.slice(0, 4),
       isConfirmed
     };
-  } catch (error) {
-    console.error("Failed to fetch exam news:", error);
+  } catch (error: any) {
+    if (error?.status === 429 || error?.message?.includes("RESOURCE_EXHAUSTED")) {
+      console.warn("Gemini API quota exceeded. Falling back to offline exam news.");
+    } else {
+      console.error("Failed to fetch exam news:", error);
+    }
     return {
       text: "Unable to reach official servers. Please check doenets.lk directly.",
       sources: [{ uri: "https://www.doenets.lk", title: "Department of Examinations Sri Lanka" }],
