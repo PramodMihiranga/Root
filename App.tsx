@@ -50,6 +50,8 @@ const App: React.FC = () => {
   const [lastNewsUpdate, setLastNewsUpdate] = useState<string | null>(null);
   const [isLoadingNews, setIsLoadingNews] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [badges, setBadges] = useState<Badge[]>(INITIAL_BADGES);
@@ -147,37 +149,41 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    let updated = false;
-    const totalCompleted = subjects.reduce((acc, s) => acc + s.units.filter(u => u.completed).length, 0);
-    const hasAny50 = subjects.some(s => s.progress >= 50);
-    const hasAny100 = subjects.some(s => s.progress >= 100);
-    const completedGoals = goals.filter(g => g.completed).length;
+    
+    setBadges(prevBadges => {
+      let updated = false;
+      const totalCompleted = subjects.reduce((acc, s) => acc + s.units.filter(u => u.completed).length, 0);
+      const hasAny50 = subjects.some(s => s.progress >= 50);
+      const hasAny100 = subjects.some(s => s.progress >= 100);
+      const completedGoals = goals.filter(g => g.completed).length;
 
-    const newBadges = badges.map(badge => {
-      if (badge.isUnlocked) return badge;
-      let unlock = false;
-      switch (badge.id) {
-        case 'first-step': unlock = totalCompleted >= 1; break;
-        case 'subject-sage': unlock = hasAny50; break;
-        case 'mastery-locked': unlock = hasAny100; break;
-        case 'goal-slayer': unlock = completedGoals >= 5; break;
-        case 'iron-will': unlock = stats.currentStreak >= 7; break;
-        case 'batch-pioneer': unlock = batchIndex >= 20; break;
-        case 'curriculum-king': unlock = totalCompleted >= 50; break;
-        case 'focus-monk': unlock = stats.currentStreak >= 3; break;
+      const newBadges = prevBadges.map(badge => {
+        if (badge.isUnlocked) return badge;
+        let unlock = false;
+        switch (badge.id) {
+          case 'first-step': unlock = totalCompleted >= 1; break;
+          case 'subject-sage': unlock = hasAny50; break;
+          case 'mastery-locked': unlock = hasAny100; break;
+          case 'goal-slayer': unlock = completedGoals >= 5; break;
+          case 'iron-will': unlock = stats.currentStreak >= 7; break;
+          case 'batch-pioneer': unlock = batchIndex >= 20; break;
+          case 'curriculum-king': unlock = totalCompleted >= 50; break;
+          case 'focus-monk': unlock = stats.currentStreak >= 3; break;
+        }
+        if (unlock) {
+          updated = true;
+          return { ...badge, isUnlocked: true, unlockedAt: Date.now() };
+        }
+        return badge;
+      });
+
+      if (updated) {
+        localStorage.setItem(STORAGE_KEYS.BADGES, JSON.stringify(newBadges));
+        return newBadges;
       }
-      if (unlock) {
-        updated = true;
-        return { ...badge, isUnlocked: true, unlockedAt: Date.now() };
-      }
-      return badge;
+      return prevBadges;
     });
-
-    if (updated) {
-      setBadges(newBadges);
-      localStorage.setItem(STORAGE_KEYS.BADGES, JSON.stringify(newBadges));
-    }
-  }, [subjects, goals, stats, batchIndex, user, badges]);
+  }, [subjects, goals, stats.currentStreak, batchIndex, user]);
 
   useEffect(() => {
     if (user && subjects.length > 0) {
@@ -191,13 +197,34 @@ const App: React.FC = () => {
     }
   }, [goals]);
 
+  const startLoginTransition = (callback: () => void) => {
+    setIsTransitioning(true);
+    setLoadingProgress(0);
+    
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += Math.random() * 20;
+      if (progress >= 100) {
+        progress = 100;
+        clearInterval(interval);
+        setTimeout(() => {
+          setIsTransitioning(false);
+          callback();
+        }, 500);
+      }
+      setLoadingProgress(Math.min(progress, 100));
+    }, 150);
+  };
+
   const handleLogin = (name: string, remember: boolean, streamId: string, chosenSubjects: Subject[]) => {
     const newUser = { name, isLoggedIn: true, streamId };
-    setUser(newUser);
-    setSubjects(chosenSubjects);
-    if (remember) {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
-    }
+    startLoginTransition(() => {
+      setUser(newUser);
+      setSubjects(chosenSubjects);
+      if (remember) {
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
+      }
+    });
   };
 
   const handleLogout = () => {
@@ -272,10 +299,36 @@ const App: React.FC = () => {
       <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500/60 text-center">Initializing Core...</span>
     </div>
   );
+
+  if (isTransitioning) return (
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 md:p-8">
+      <div className="w-full max-w-md px-8 py-16 rounded-[2.5rem] bg-slate-900 border border-slate-800 shadow-2xl flex flex-col items-center animate-reveal relative overflow-hidden">
+         {/* Background Glow */}
+         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 blur-3xl" />
+         
+         <div className="text-5xl md:text-6xl mb-8 animate-pulse drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]">🚀</div>
+         <h2 className="text-xl md:text-2xl font-black text-white tracking-widest uppercase mb-3 text-center">Preparing Workspace</h2>
+         <p className="text-[10px] md:text-xs text-slate-500 mb-12 uppercase tracking-[0.2em] text-center max-w-[80%] leading-relaxed">Syncing user data and constructing syllabus modules...</p>
+         
+         <div className="w-full h-1.5 md:h-2 bg-slate-950 rounded-full overflow-hidden shadow-inner relative">
+           <div 
+             className="absolute top-0 bottom-0 left-0 bg-gradient-to-r from-blue-600 to-cyan-400 transition-all duration-150 ease-out z-10 shadow-[0_0_10px_rgba(56,189,248,0.5)]"
+             style={{ width: `${loadingProgress}%` }}
+           />
+         </div>
+         <div className="w-full flex justify-between mt-4 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">
+           <span>System Load</span>
+           <span className="text-blue-400">{Math.round(loadingProgress)}%</span>
+         </div>
+      </div>
+    </div>
+  );
   
   if (!user) return <LoginPage onLogin={handleLogin} onAdminLogin={() => {
-    setUser({ name: 'Admin', isLoggedIn: true, streamId: AL_STREAMS[0].id });
-    setActiveView('admin');
+    startLoginTransition(() => {
+      setUser({ name: 'Admin', isLoggedIn: true, streamId: AL_STREAMS[0].id });
+      setActiveView('admin');
+    });
   }} />;
 
   const renderView = () => {

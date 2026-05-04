@@ -17,7 +17,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onAdminLogin }) => {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   
-      const [adminLoading, setAdminLoading] = useState(false);
+      const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminForm, setShowAdminForm] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
 
   const currentStream = useMemo(() => 
     AL_STREAMS.find(s => s.id === streamId) || AL_STREAMS[0]
@@ -215,29 +218,69 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onAdminLogin }) => {
               Initialize Strategy
             </button>
             <div className="pt-6 mt-6 border-t border-slate-800/50 flex flex-col items-center w-full">
-              <button
-                type="button"
-                disabled={adminLoading}
-                onClick={async () => {
-                  setAdminLoading(true);
-                  setError('');
-                  try {
-                    await loginWithGoogle();
-                    onAdminLogin();
-                  } catch (err: any) {
-                    setError('Failed to login as admin.');
-                    console.error(err);
-                  } finally {
-                    setAdminLoading(false);
-                  }
-                }}
-                className="text-xs text-slate-500 hover:text-slate-300 font-bold uppercase tracking-widest transition-colors flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
-                </svg>
-                {adminLoading ? 'Authenticating...' : 'Admin Access (via Google)'}
-              </button>
+              {!showAdminForm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAdminForm(true)}
+                  className="text-xs text-slate-500 hover:text-slate-300 font-bold uppercase tracking-widest transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                  </svg>
+                  Admin Access
+                </button>
+              ) : (
+                <div className="w-full space-y-4 animate-reveal">
+                  <div className="text-center mb-4">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Administrator Login</h3>
+                    <p className="text-[10px] text-slate-500 mt-1">Provide credentials to access control panel.</p>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    value={adminUsername}
+                    onChange={(e) => setAdminUsername(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                  />
+                  <button
+                    type="button"
+                    disabled={adminLoading || !adminUsername || !adminPassword}
+                    onClick={() => {
+                      setAdminLoading(true);
+                      setError('');
+                      setTimeout(() => {
+                        // Hardcoded credentials
+                        if (adminUsername === 'admin' && adminPassword === 'sudo123') {
+                          onAdminLogin();
+                        } else {
+                          setError('Invalid credentials.');
+                        }
+                        setAdminLoading(false);
+                      }, 600);
+                    }}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-xs"
+                  >
+                    {adminLoading ? 'Authenticating...' : 'Sign In'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                        setShowAdminForm(false);
+                        setError('');
+                    }}
+                    className="w-full py-3 text-slate-500 hover:text-slate-300 font-bold uppercase tracking-widest text-[10px] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </form>
